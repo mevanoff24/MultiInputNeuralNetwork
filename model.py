@@ -111,57 +111,91 @@ class MultiInputNN(nn.Module):
             X = X + self.y_range[0]
         return X
     
-
     
-    def fit(self, train_loader, learning_rate=1e-3, batch_size=64, epochs=1, save=False, save_path='tmp/checkpoint.pth.tar', 
+    def fit(self, train_loader, learning_rate=1e-3, batch_size=64, epochs=1, val_loader=None, metrics=None, save=False, save_path='tmp/checkpoint.pth.tar', 
                     pre_saved=False):
 
         loss = nn.MSELoss()
-        optimizer = RMSprop(model.parameters(), lr=learning_rate)
+        optimizer = RMSprop(self.parameters(), lr=learning_rate)
         n_batches = int(train_loader.dataset.N / train_loader.batch_size)
 
         if pre_saved:
             checkpoint = torch.load(save_path)
             start_epoch = checkpoint['epoch']
-            model.load_state_dict(checkpoint['state_dict'])
+            self.load_state_dict(checkpoint['state_dict'])
             optimizer.load_state_dict(checkpoint['optimizer'])
             print('...restoring model...')
-
-        for epoch in range(epochs):
-            if pre_saved:
-    #             print('Here', 'start_epoch', start_epoch, 'epoch', epoch)
-    #             epoch = start_epoch
-                pre_saved = False
+        begin = True
+        for epoch_ in range(epochs):        
+            if pre_saved:      
+                if begin:
+                    epoch = start_epoch
+                    begin = False
+            else:
+                epoch = epoch_
+            epoch += 1
 
             epoch_loss = 0.
+            self.train()
             for i, (batch_cat, batch_cont, batch_y) in enumerate(train_loader):
                 optimizer.zero_grad()
                 batch_cat, batch_cont, batch_y = Variable(batch_cat), Variable(batch_cont), Variable(batch_y)
 
-                y_hat = model.forward(batch_cat, batch_cont)
+                y_hat = self.forward(batch_cat, batch_cont)
                 l = loss(y_hat, batch_y)
                 epoch_loss += l.data[0]
-
-
+                
                 l.backward()
                 optimizer.step()
+                
                 if i != 0 and i % 2000 == 0:
-                    acc = rmse(y_hat.data.numpy(), batch_y.data.numpy())
                     print('iteration: {} of n_batches: {}'.format(i, n_batches))
-            
-            print('epoch: {}, train_loss: {}'.format(epoch, epoch_loss / n_batches))
+                    
+            train_loss = epoch_loss / n_batches
+            print_output = [epoch, train_loss]
+            if val_loader:
+                val_loss = self.validate(val_loader, loss, metrics)
+                for i in val_loss: print_output.append(i)
 
+            print(print_output)
         if save:
             state = {
             'epoch': epoch,
-            'state_dict': model.state_dict(),
+            'state_dict': self.state_dict(),
             'optimizer': optimizer.state_dict()}
             self.save_checkpoint(state, filename=save_path)
 
+    def validate(self, val_loader, loss, metrics=None):
+        self.eval()
+        n_batches = int(val_loader.dataset.N / val_loader.batch_size)
+        total_loss = 0.
+        metric_scores = {}
+        if metrics:
+            for metric in metrics:
+                metric_scores[str(metric)] = []
+                
+        for i, (batch_cat, batch_cont, batch_y) in enumerate(val_loader):
+            batch_cat, batch_cont, batch_y = Variable(batch_cat), Variable(batch_cont), Variable(batch_y)
+            y_hat = self.forward(batch_cat, batch_cont)
+            l = loss(y_hat, batch_y)
+            total_loss += l.data[0]
+            
+            if metrics:
+                for metric in metrics:
+                    metric_scores[str(metric)].append(metric(batch_y.data.numpy(), y_hat.data.numpy()))
+        if metrics:
+            final_metrics = []
+            for metric in metrics:
+                final_metrics.append(np.sum(metric_scores[str(metric)]) / n_batches)
+            return total_loss / n_batches, final_metrics
+        else:
+            return total_loss / n_batches
+        
+        
     def save_checkpoint(self, state, filename='checkpoint.pth.tar'):
         torch.save(state, filename)
         
-    def my_predict(self, df, cat_flds, cont_flds):
+    def predict(self, df, cat_flds, cont_flds):
         self.eval()
         cats = np.asarray(df[cat_flds], dtype=np.int64)
         conts = np.asarray(df[cont_flds], dtype=np.float32)
