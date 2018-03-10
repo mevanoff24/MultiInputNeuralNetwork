@@ -3,7 +3,9 @@ from functools import partial
 import pandas as pd
 import os
 from tqdm import tqdm_notebook, tnrange, tqdm
+import sys
 
+import torch
 from torch import nn
 from torch.nn.init import kaiming_normal
 import torch.nn.functional as F
@@ -227,7 +229,8 @@ def fit(model, train_loader, loss, opt_fn=None, learning_rate=1e-3, batch_size=6
             for i in val_loss: print_output.append(i)
 
         # epoch, train loss, val loss, metrics (optional)
-        print(print_output)
+        print('\n', print_output)
+        # sys.stdout.write('\r' + str(print_output))
 
         # reset scheduler
         if epoch_ % cycle_len == 0:
@@ -256,7 +259,12 @@ def train(model, train_loader, optimizer, scheduler, loss, print_period=1000):
         all_lr.append(scheduler.get_lr())
 
         if i != 0 and i % print_period == 0:
-            print('iteration: {} of n_batches: {}'.format(i, n_batches))
+            # sys.stdout.write('\r' + 'iteration: {} of n_batches: {}'.format(i, n_batches))
+            # sys.stdout.flush()
+            # print('iteration: {} of n_batches: {}'.format(i, n_batches))
+            statement = '[{}/{} ({:.0f}%)]'.format(i, n_batches, (i / n_batches)*100.)
+            sys.stdout.write('\r' + statement)
+            sys.stdout.flush()
 
     train_loss = epoch_loss / n_batches
     return train_loss
