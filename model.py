@@ -248,7 +248,7 @@ def train(model, train_loader, optimizer, scheduler, loss, print_period=1000):
         optimizer.zero_grad()
         batch_cat, batch_cont, batch_y = Variable(batch_cat), Variable(batch_cont), Variable(batch_y)
 
-        y_hat = model.forward(batch_cat, batch_cont)
+        y_hat = model(batch_cat, batch_cont)
         l = loss(y_hat, batch_y)
         epoch_loss += l.data[0]
 
@@ -280,7 +280,7 @@ def validate(model, val_loader, optimizer, loss, metrics=None):
 
     for i, (batch_cat, batch_cont, batch_y) in enumerate(val_loader):
         batch_cat, batch_cont, batch_y = Variable(batch_cat), Variable(batch_cont), Variable(batch_y)
-        y_hat = model.forward(batch_cat, batch_cont)
+        y_hat = model(batch_cat, batch_cont)
         l = loss(y_hat, batch_y)
         total_loss += l.data[0]
 
@@ -306,7 +306,7 @@ def predict(model, df, cat_flds, cont_flds):
     conts = np.asarray(df[cont_flds], dtype=np.float32)
     x_cat = Variable(torch.from_numpy(cats))
     x_cont = Variable(torch.from_numpy(conts))
-    pred = model.forward(x_cat, x_cont)
+    pred = model(x_cat, x_cont)
     return pred.data.numpy().flatten()
 
 def load_model(model, save_path='tmp/checkpoint.pth.tar'):
