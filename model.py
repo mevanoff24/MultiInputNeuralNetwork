@@ -240,6 +240,8 @@ def fit(model, train_loader, loss, opt_fn=None, learning_rate=1e-3, batch_size=6
     
 def train(model, train_loader, optimizer, scheduler, loss, print_period=1000):
 
+    # change this to show expontially weighted moving average
+    # avg_loss = avg_loss * avg_mom + loss * (1-avg_mom)
     epoch_loss = 0.
     n_batches = int(train_loader.dataset.N / train_loader.batch_size)
     model.train()
